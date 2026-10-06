@@ -1,10 +1,13 @@
 #include<glad/glad.h>
 #include <GLFW/glfw3.h>
+#include <glm.hpp>
+#include <cmath>
+//#include <iostream>
 
 float vertices[] = {
-    -0.5f, -0.5f,
-     0.5f, -0.5f,
-     0.0f,  0.5f
+    -0.05f, -0.05f,
+     0.05f, -0.05f,
+     0.0f,   0.05f
 };
 
 const char* vertexShaderSource = R"(
@@ -12,9 +15,11 @@ const char* vertexShaderSource = R"(
 
 layout (location = 0) in vec2 aPos;
 
+uniform vec2 particlePosition;
+
 void main()
 {
-    gl_Position = vec4(aPos.x * 0.5f, aPos.y * 2.0f, 0.0, 1.0);
+    gl_Position = vec4(aPos + particlePosition, 0.0, 1.0);
 }
 )";
 
@@ -50,10 +55,27 @@ unsigned int createShaderProgram() {
     return shaderProgram;
 }
 
+struct Particle {
+    glm::vec2 position;
+    glm::vec2 velocity;
+
+    float lifetime;
+    float size;
+};
+
 int main()
 {
     //init glfw
     glfwInit();
+
+    //std::cout << sizeof(Particle);
+
+    Particle particle;
+
+    particle.position = glm::vec2(0.0f, -0.5f);
+    particle.velocity = glm::vec2(0.0f, 0.5f);
+    particle.lifetime = 5.0f;
+    particle.size = 0.1f;
 
     //tell opengl what version we are gonna use
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
@@ -89,8 +111,28 @@ int main()
     //enables the vertex attribute at location 0
     glEnableVertexAttribArray(0);
 
+    //this is the uniform
+    int particlePositonLocation = glGetUniformLocation(shaderProgram, "particlePosition");
+
+    float lastFrame = 0.0f;
+    float triangleX = 0.0f;
+
+
 
     while (!glfwWindowShouldClose(window)) {
+        float currentFrame = glfwGetTime();
+
+        float deltaTime = currentFrame - lastFrame;
+
+        lastFrame = currentFrame;
+
+        triangleX = std::sin(currentFrame * 3.0f) * 0.5f;
+
+        particle.position += particle.velocity * deltaTime;
+
+
+
+        //--------------RENDERING--------------
 
         //when clearing the screen use this color
         glClearColor(0.1f, 0.05f, 0.02f, 1.0f);
@@ -99,6 +141,9 @@ int main()
         glClear(GL_COLOR_BUFFER_BIT);
 
         glUseProgram(shaderProgram);
+
+        //here we add the uniform
+        glUniform2f(particlePositonLocation, particle.position.x, particle.position.y);
 
         glBindVertexArray(VAO);
         glDrawArrays(GL_TRIANGLES, 0, 3);
@@ -112,3 +157,4 @@ int main()
 }
     //Vertex shader : processes each vertex and determines its position.
     //Fragment shader : determines the color of the pixels covered by our triangle.
+    //A uniform allows our C++ program to send a value to a shader.
