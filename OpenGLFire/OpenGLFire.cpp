@@ -2,6 +2,8 @@
 #include <GLFW/glfw3.h>
 #include <glm.hpp>
 #include <cmath>
+#include <random>
+#include <vector>
 //#include <iostream>
 
 float vertices[] = {
@@ -16,10 +18,11 @@ const char* vertexShaderSource = R"(
 layout (location = 0) in vec2 aPos;
 
 uniform vec2 particlePosition;
+uniform float particleSize;
 
 void main()
 {
-    gl_Position = vec4(aPos + particlePosition, 0.0, 1.0);
+    gl_Position = vec4(aPos * particleSize + particlePosition, 0.0, 1.0);
 }
 )";
 
@@ -63,6 +66,23 @@ struct Particle {
     float size;
 };
 
+std::random_device randomDevice;
+std::mt19937 randomGenerator(randomDevice());
+std::uniform_real_distribution<float> horizontalVelocity(-0.2f, 0.2f);
+std::uniform_real_distribution<float> verticalVelocity(0.4f, 1.0f);
+std::uniform_real_distribution<float> particleLifetime(2.0f, 5.0f);
+std::uniform_real_distribution<float> particleSize(0.03f, 0.12f);
+
+void respawnParticle(Particle& particle)
+{
+    particle.position = glm::vec2(0.0f, -0.5f);
+
+    particle.velocity = glm::vec2(horizontalVelocity(randomGenerator), verticalVelocity(randomGenerator));
+
+    particle.lifetime = particleLifetime(randomGenerator);
+    particle.size = particleSize(randomGenerator);
+}
+
 int main()
 {
     //init glfw
@@ -70,12 +90,23 @@ int main()
 
     //std::cout << sizeof(Particle);
 
-    Particle particle;
+    std::vector<Particle> particles;
 
-    particle.position = glm::vec2(0.0f, -0.5f);
-    particle.velocity = glm::vec2(0.0f, 0.5f);
+    const int particleCount = 50;
+
+    for (int i = 0; i < particleCount; ++i)
+    {
+        Particle particle;
+
+        respawnParticle(particle);
+
+        particles.push_back(particle);
+    }
+
+    /*particle.position = glm::vec2(0.0f, -0.5f);
+    particle.velocity = glm::vec2(horizontalVelocity(randomGenerator), 0.5f);
     particle.lifetime = 5.0f;
-    particle.size = 0.1f;
+    particle.size = 0.1f;*/
 
     //tell opengl what version we are gonna use
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
@@ -113,6 +144,7 @@ int main()
 
     //this is the uniform
     int particlePositonLocation = glGetUniformLocation(shaderProgram, "particlePosition");
+    int particleSizeLocation = glGetUniformLocation(shaderProgram, "particleSize");
 
     float lastFrame = 0.0f;
     float triangleX = 0.0f;
@@ -126,9 +158,21 @@ int main()
 
         lastFrame = currentFrame;
 
-        triangleX = std::sin(currentFrame * 3.0f) * 0.5f;
+        //triangleX = std::sin(currentFrame * 3.0f) * 0.5f;
 
-        particle.position += particle.velocity * deltaTime;
+        // Update particles
+        for (Particle& particle : particles)
+        {
+            particle.position += particle.velocity * deltaTime;
+
+            particle.lifetime -= deltaTime;
+
+            if (particle.lifetime <= 0.0f)
+            {
+                respawnParticle(particle);
+            }
+        }
+
 
 
 
@@ -141,12 +185,18 @@ int main()
         glClear(GL_COLOR_BUFFER_BIT);
 
         glUseProgram(shaderProgram);
-
-        //here we add the uniform
-        glUniform2f(particlePositonLocation, particle.position.x, particle.position.y);
-
+        
         glBindVertexArray(VAO);
-        glDrawArrays(GL_TRIANGLES, 0, 3);
+
+        // Draw particles
+        for (const Particle& particle : particles) {
+            //here we add the uniform
+            glUniform2f(particlePositonLocation, particle.position.x, particle.position.y);
+            glUniform1f(particleSizeLocation, particle.size);
+
+            glDrawArrays(GL_TRIANGLES, 0, 3);
+        }
+
 
 
         glfwSwapBuffers(window);
