@@ -1,3 +1,3 @@
 ﻿  OpenGLFire.cpp
-D:\Visual studio\OpenGLFire\OpenGLFire\OpenGLFire.cpp(155,28): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
+D:\Visual studio\OpenGLFire\OpenGLFire\OpenGLFire.cpp(183,28): warning C4244: 'initializing': conversion from 'double' to 'float', possible loss of data
   OpenGLFire.vcxproj -> D:\Visual studio\OpenGLFire\Debug\OpenGLFire.exe

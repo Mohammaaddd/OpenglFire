@@ -7,9 +7,13 @@
 //#include <iostream>
 
 float vertices[] = {
-    -0.05f, -0.05f,
-     0.05f, -0.05f,
-     0.0f,   0.05f
+    -0.5f, -0.5f,
+     0.5f, -0.5f,
+     0.5f,  0.5f,
+
+    -0.5f, -0.5f,
+     0.5f,  0.5f,
+    -0.5f,  0.5f
 };
 
 const char* vertexShaderSource = R"(
@@ -20,8 +24,12 @@ layout (location = 0) in vec2 aPos;
 uniform vec2 particlePosition;
 uniform float particleSize;
 
+out vec2 localPosition;
+
 void main()
 {
+    localPosition = aPos;
+
     gl_Position = vec4(aPos * particleSize + particlePosition, 0.0, 1.0);
 }
 )";
@@ -31,9 +39,21 @@ const char* fragmentShaderSource = R"(
 
 out vec4 FragColor;
 
+uniform vec3 particleColor;
+
+in vec2 localPosition;
+
 void main()
 {
-    FragColor = vec4(1.0, 0.3, 0.05, 1.0);
+    float distanceFromCenter = length(localPosition);
+
+    //this the code that remove the edges and make it a circle
+    if(distanceFromCenter > 0.5)
+    {
+        discard;
+    }
+
+    FragColor = vec4(particleColor, 1.0);
 }
 )";
 
@@ -64,6 +84,8 @@ struct Particle {
 
     float lifetime;
     float size;
+
+    glm::vec3 color;
 };
 
 std::random_device randomDevice;
@@ -72,15 +94,20 @@ std::uniform_real_distribution<float> horizontalVelocity(-0.2f, 0.2f);
 std::uniform_real_distribution<float> verticalVelocity(0.4f, 1.0f);
 std::uniform_real_distribution<float> particleLifetime(2.0f, 5.0f);
 std::uniform_real_distribution<float> particleSize(0.03f, 0.12f);
+std::uniform_real_distribution<float> particleRed(0.8f, 1.0f);
+std::uniform_real_distribution<float> particleGreen(0.1f, 0.45f);
+std::uniform_real_distribution<float> particleBlue(0.0f, 0.08f);
+std::uniform_real_distribution<float> particleRandomXPos(-0.5f, 0.5f);
 
 void respawnParticle(Particle& particle)
 {
-    particle.position = glm::vec2(0.0f, -0.5f);
+    particle.position = glm::vec2(particleRandomXPos(randomGenerator), -0.5f);
 
     particle.velocity = glm::vec2(horizontalVelocity(randomGenerator), verticalVelocity(randomGenerator));
 
     particle.lifetime = particleLifetime(randomGenerator);
     particle.size = particleSize(randomGenerator);
+    particle.color = glm::vec3(particleRed(randomGenerator), particleGreen(randomGenerator), particleBlue(randomGenerator));
 }
 
 int main()
@@ -145,6 +172,7 @@ int main()
     //this is the uniform
     int particlePositonLocation = glGetUniformLocation(shaderProgram, "particlePosition");
     int particleSizeLocation = glGetUniformLocation(shaderProgram, "particleSize");
+    int particleColorLocation = glGetUniformLocation(shaderProgram, "particleColor");
 
     float lastFrame = 0.0f;
     float triangleX = 0.0f;
@@ -191,10 +219,11 @@ int main()
         // Draw particles
         for (const Particle& particle : particles) {
             //here we add the uniform
-            glUniform2f(particlePositonLocation, particle.position.x, particle.position.y);
             glUniform1f(particleSizeLocation, particle.size);
+            glUniform2f(particlePositonLocation, particle.position.x, particle.position.y);
+            glUniform3f(particleColorLocation, particle.color.x, particle.color.y, particle.color.z);
 
-            glDrawArrays(GL_TRIANGLES, 0, 3);
+            glDrawArrays(GL_TRIANGLES, 0, 6);
         }
 
 
