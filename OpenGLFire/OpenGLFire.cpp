@@ -53,7 +53,11 @@ void main()
         discard;
     }
 
-    FragColor = vec4(particleColor, 1.0);
+    float glow = 1.0 - (distanceFromCenter / 0.5);
+
+    glow = smoothstep(0.0, 1.0, glow);
+
+    FragColor = vec4(particleColor, glow);
 }
 )";
 
@@ -97,11 +101,11 @@ std::uniform_real_distribution<float> particleSize(0.03f, 0.12f);
 std::uniform_real_distribution<float> particleRed(0.8f, 1.0f);
 std::uniform_real_distribution<float> particleGreen(0.1f, 0.45f);
 std::uniform_real_distribution<float> particleBlue(0.0f, 0.08f);
-std::uniform_real_distribution<float> particleRandomXPos(-0.5f, 0.5f);
+std::uniform_real_distribution<float> spawnPositionX(-0.15f, 0.15f);
 
 void respawnParticle(Particle& particle)
 {
-    particle.position = glm::vec2(particleRandomXPos(randomGenerator), -0.5f);
+    particle.position = glm::vec2(spawnPositionX(randomGenerator), -0.5f);
 
     particle.velocity = glm::vec2(horizontalVelocity(randomGenerator), verticalVelocity(randomGenerator));
 
@@ -148,6 +152,12 @@ int main()
     //init glad
     gladLoadGLLoader((GLADloadproc)glfwGetProcAddress);
 
+    //enables blending, allowing the fragment's alpha value to affect how it combines with the existing screen color.
+    glEnable(GL_BLEND);
+
+    //chooses how the new color combines with the background. This is standard alpha blending, which lets transparent particle edges fade smoothly into the scene.
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
     //vertex array object
     unsigned int VAO;
 
@@ -191,9 +201,18 @@ int main()
         // Update particles
         for (Particle& particle : particles)
         {
-            particle.position += particle.velocity * deltaTime;
+            //particle.position += particle.velocity * deltaTime;
 
             particle.lifetime -= deltaTime;
+
+            float height = particle.position.y + 0.5f;
+
+            float spread = height * 0.15f;
+
+            particle.position.x += particle.velocity.x * deltaTime
+                + (particle.position.x >= 0.0f ? spread : -spread) * deltaTime;
+
+            particle.position.y += particle.velocity.y * deltaTime;
 
             if (particle.lifetime <= 0.0f)
             {
