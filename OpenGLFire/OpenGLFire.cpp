@@ -4,7 +4,7 @@
 #include <cmath>
 #include <random>
 #include <vector>
-//#include <iostream>
+#include <iostream>
 
 float vertices[] = {
     -0.5f, -0.5f,
@@ -39,9 +39,12 @@ const char* fragmentShaderSource = R"(
 
 out vec4 FragColor;
 
-uniform vec3 particleColor;
-
 in vec2 localPosition;
+
+uniform vec3 particleColor;
+uniform float particleHeight;
+uniform float particleFade;
+uniform float particleFlicker;
 
 void main()
 {
@@ -55,9 +58,18 @@ void main()
 
     float glow = 1.0 - (distanceFromCenter / 0.5);
 
-    glow = smoothstep(0.0, 1.0, glow);
+    glow = max(glow, 0.0);
 
-    FragColor = vec4(particleColor, glow);
+    glow = pow(glow, 1.5);
+
+    float heightFactor = clamp(particleHeight, 0.0, 1.0);
+
+    vec3 bottomColor = vec3(1.0, 0.85, 0.2);
+    vec3 topColor = vec3(0.9, 0.08, 0.01);
+
+    vec3 fireColor = mix(bottomColor, topColor, heightFactor);
+
+    FragColor = vec4(fireColor * particleColor * particleFlicker, glow * particleFade);
 }
 )";
 
@@ -92,6 +104,8 @@ struct Particle {
     glm::vec3 color;
 };
 
+float windStrength = 0.0f;
+
 std::random_device randomDevice;
 std::mt19937 randomGenerator(randomDevice());
 std::uniform_real_distribution<float> horizontalVelocity(-0.2f, 0.2f);
@@ -102,6 +116,7 @@ std::uniform_real_distribution<float> particleRed(0.8f, 1.0f);
 std::uniform_real_distribution<float> particleGreen(0.1f, 0.45f);
 std::uniform_real_distribution<float> particleBlue(0.0f, 0.08f);
 std::uniform_real_distribution<float> spawnPositionX(-0.15f, 0.15f);
+std::uniform_real_distribution<float> turbulence(-0.4f, 0.4f);
 
 void respawnParticle(Particle& particle)
 {
@@ -123,7 +138,7 @@ int main()
 
     std::vector<Particle> particles;
 
-    const int particleCount = 50;
+    const int particleCount = 200;
 
     for (int i = 0; i < particleCount; ++i)
     {
@@ -142,6 +157,8 @@ int main()
     //tell opengl what version we are gonna use
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+
+
 
     //create the window
     GLFWwindow* window = glfwCreateWindow(800, 600, "openGL Fire", NULL, NULL);
@@ -183,9 +200,13 @@ int main()
     int particlePositonLocation = glGetUniformLocation(shaderProgram, "particlePosition");
     int particleSizeLocation = glGetUniformLocation(shaderProgram, "particleSize");
     int particleColorLocation = glGetUniformLocation(shaderProgram, "particleColor");
+    int particleHeightLocaiton = glGetUniformLocation(shaderProgram, "particleHeight");
+    int particleFadeLocation = glGetUniformLocation(shaderProgram, "particleFade");
+    int particleFlickerLocation = glGetUniformLocation(shaderProgram, "particleFlicker");
 
     float lastFrame = 0.0f;
     float triangleX = 0.0f;
+    float fadeDuration = 0.7f;
 
 
 
@@ -193,6 +214,8 @@ int main()
         float currentFrame = glfwGetTime();
 
         float deltaTime = currentFrame - lastFrame;
+
+        windStrength = std::sin(glfwGetTime() * 0.7f) * 0.15f;
 
         lastFrame = currentFrame;
 
@@ -207,10 +230,14 @@ int main()
 
             float height = particle.position.y + 0.5f;
 
-            float spread = height * 0.15f;
+            float spread = height * 0.08f;
+
+            particle.position.x += (turbulence(randomGenerator) * 0.5f + windStrength) * deltaTime;
 
             particle.position.x += particle.velocity.x * deltaTime
                 + (particle.position.x >= 0.0f ? spread : -spread) * deltaTime;
+
+            particle.velocity.y += 0.3f * deltaTime;
 
             particle.position.y += particle.velocity.y * deltaTime;
 
@@ -237,8 +264,19 @@ int main()
 
         // Draw particles
         for (const Particle& particle : particles) {
+            float heightFactor = glm::clamp((particle.position.y + 0.5f) / 1.0f, 0.0f, 1.0f);
+
+            float currentSize = particle.size * (1.0f - heightFactor * 0.6f);
+
+            float particleFade = glm::clamp(particle.lifetime / fadeDuration, 0.0f, 1.0f);
+
+            float particleFlicker = 0.85f + 0.15f * std::sin(static_cast<float>(glfwGetTime()) * 12.0f + particle.position.x * 20.0f + particle.position.y * 15.0f);
+
             //here we add the uniform
-            glUniform1f(particleSizeLocation, particle.size);
+            glUniform1f(particleSizeLocation, currentSize);
+            glUniform1f(particleFadeLocation, particleFade);
+            glUniform1f(particleFlickerLocation, particleFlicker);
+            glUniform1f(particleHeightLocaiton, glm::clamp((particle.position.y + 0.5f) / 1.0f, 0.0f, 1.0f));
             glUniform2f(particlePositonLocation, particle.position.x, particle.position.y);
             glUniform3f(particleColorLocation, particle.color.x, particle.color.y, particle.color.z);
 
@@ -256,3 +294,15 @@ int main()
     //Vertex shader : processes each vertex and determines its position.
     //Fragment shader : determines the color of the pixels covered by our triangle.
     //A uniform allows our C++ program to send a value to a shader.
+
+
+
+
+
+
+
+
+    //old code
+/*float glow = 1.0 - (distanceFromCenter / 0.5);
+glow = glow * glow;
+glow = smoothstep(0.0, 1.0, glow);*/
