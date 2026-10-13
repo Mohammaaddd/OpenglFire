@@ -137,6 +137,12 @@
       <AdditionalIncludeDirectories Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(SolutionDir)Depedencies\GLEW\include;$(SolutionDir)Depedencies\GLFW\include;$(SolutionDir)Depedencies\glad\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="flame.frag" />
+    <None Include="flame.vert" />
+    <None Include="particle.frag" />
+    <None Include="particle.vert" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

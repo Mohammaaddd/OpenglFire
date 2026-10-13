@@ -22,4 +22,10 @@
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="flame.vert" />
+    <None Include="flame.frag" />
+    <None Include="particle.vert" />
+    <None Include="particle.frag" />
+  </ItemGroup>
 </Project>

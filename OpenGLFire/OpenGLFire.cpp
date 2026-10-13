@@ -5,6 +5,8 @@
 #include <random>
 #include <vector>
 #include <iostream>
+#include <fstream>
+#include <sstream>
 
 float vertices[] = {
     -0.5f, -0.5f,
@@ -16,64 +18,34 @@ float vertices[] = {
     -0.5f,  0.5f
 };
 
-const char* vertexShaderSource = R"(
-#version 330 core
+std::string readShaderFile(const char* filePath) {
+    std::ifstream file(filePath);
 
-layout (location = 0) in vec2 aPos;
+    if (!file.is_open()) {
+        std::cerr << "Failed to open shader file: " << filePath << '\n';
 
-uniform vec2 particlePosition;
-uniform float particleSize;
-
-out vec2 localPosition;
-
-void main()
-{
-    localPosition = aPos;
-
-    gl_Position = vec4(aPos * particleSize + particlePosition, 0.0, 1.0);
-}
-)";
-
-const char* fragmentShaderSource = R"(
-#version 330 core
-
-out vec4 FragColor;
-
-in vec2 localPosition;
-
-uniform vec3 particleColor;
-uniform float particleHeight;
-uniform float particleFade;
-uniform float particleFlicker;
-
-void main()
-{
-    float distanceFromCenter = length(localPosition);
-
-    //this the code that remove the edges and make it a circle
-    if(distanceFromCenter > 0.5)
-    {
-        discard;
+        return "";
     }
 
-    float glow = 1.0 - (distanceFromCenter / 0.5);
+    std::stringstream buffer;
+    buffer << file.rdbuf();
 
-    glow = max(glow, 0.0);
-
-    glow = pow(glow, 1.5);
-
-    float heightFactor = clamp(particleHeight, 0.0, 1.0);
-
-    vec3 bottomColor = vec3(1.0, 0.85, 0.2);
-    vec3 topColor = vec3(0.9, 0.08, 0.01);
-
-    vec3 fireColor = mix(bottomColor, topColor, heightFactor);
-
-    FragColor = vec4(fireColor * particleColor * particleFlicker, glow * particleFade);
+    return buffer.str();
 }
-)";
 
-unsigned int createShaderProgram() {
+unsigned int createShaderProgram(const char* vertexPath, const char* fragmentPath) {
+    std::string vertexCode = readShaderFile(vertexPath);
+    std::string fragmentCode = readShaderFile(fragmentPath);
+
+    if (vertexCode.empty() || fragmentCode.empty()) {
+        std::cerr << "Failed to load shader source. \n";
+        return 0;
+    }
+
+    const char* vertexShaderSource = vertexCode.c_str();
+    const char* fragmentShaderSource = fragmentCode.c_str();
+
+
     unsigned int vertexShader = glCreateShader(GL_VERTEX_SHADER);
     glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
     glCompileShader(vertexShader);
@@ -138,7 +110,7 @@ int main()
 
     std::vector<Particle> particles;
 
-    const int particleCount = 200;
+    const int particleCount = 2000;
 
     for (int i = 0; i < particleCount; ++i)
     {
@@ -190,19 +162,23 @@ int main()
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
-    unsigned int shaderProgram = createShaderProgram();
+    unsigned int shaderProgram = createShaderProgram("particle.vert", "particle.frag");
+    unsigned int flameShaderProgram = createShaderProgram("flame.vert", "flame.frag");
 
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void*)0);
     //enables the vertex attribute at location 0
     glEnableVertexAttribArray(0);
 
     //this is the uniform
-    int particlePositonLocation = glGetUniformLocation(shaderProgram, "particlePosition");
+    int particlePositionLocation = glGetUniformLocation(shaderProgram, "particlePosition");
     int particleSizeLocation = glGetUniformLocation(shaderProgram, "particleSize");
     int particleColorLocation = glGetUniformLocation(shaderProgram, "particleColor");
     int particleHeightLocaiton = glGetUniformLocation(shaderProgram, "particleHeight");
     int particleFadeLocation = glGetUniformLocation(shaderProgram, "particleFade");
     int particleFlickerLocation = glGetUniformLocation(shaderProgram, "particleFlicker");
+
+    //flame
+    int timeLocation = glGetUniformLocation(flameShaderProgram, "time");
 
     float lastFrame = 0.0f;
     float triangleX = 0.0f;
@@ -258,9 +234,10 @@ int main()
         //clear the screen using the color we chose
         glClear(GL_COLOR_BUFFER_BIT);
 
+
         glUseProgram(shaderProgram);
         
-        glBindVertexArray(VAO);
+        //glBindVertexArray(VAO);
 
         // Draw particles
         for (const Particle& particle : particles) {
@@ -277,12 +254,20 @@ int main()
             glUniform1f(particleFadeLocation, particleFade);
             glUniform1f(particleFlickerLocation, particleFlicker);
             glUniform1f(particleHeightLocaiton, glm::clamp((particle.position.y + 0.5f) / 1.0f, 0.0f, 1.0f));
-            glUniform2f(particlePositonLocation, particle.position.x, particle.position.y);
+            glUniform2f(particlePositionLocation, particle.position.x, particle.position.y);
             glUniform3f(particleColorLocation, particle.color.x, particle.color.y, particle.color.z);
 
             glDrawArrays(GL_TRIANGLES, 0, 6);
         }
 
+
+        float currentTime = static_cast<float>(glfwGetTime());
+        glUniform1f(timeLocation, currentTime * 10);
+
+        glUseProgram(flameShaderProgram);
+
+        glBindVertexArray(VAO);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
 
 
         glfwSwapBuffers(window);
