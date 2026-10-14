@@ -28,17 +28,25 @@ float smoothNoise(float value)
 
 void main()
 {
-    float height = uv.y;
+    float animatedHeight = uv.y + 0.012 * sin(time * 7.0 + uv.x * 8.0);
+
+    float height = clamp(animatedHeight, 0.0, 1.0);
 
     float turbulence = smoothNoise(height * 12.0 + time * 2.0);
 
-    float center = 0.5 + 0.06 * sin(height * 8.0 + time * 2.0) + 0.025 * sin(height * 17.0 - time * 3.0) + (turbulence - 0.5) * 0.035;
 
-    float width = 0.32 * pow(1.0 - height, 0.7);
+    float wave1 = sin(height * 10.0 - time * 3.5);
+    float wave2 = sin(height * 17.0 + time * 4.8);
+    float wave3 = sin(height * 25.0 - time * 6.2);
 
-    width *= 0.9 + 0.1 * sin(height * 10.0 + time * 4.0);
-    width *= 0.95 + turbulence * 0.1;
-    width *= 0.75 + 0.25 * sin(height * 12.0 + 1.0);
+    float center = 0.5 + 0.035 * wave1 + 0.018 * wave2 + 0.008 * wave3;
+
+    float baseWidth = 0.34 * pow(1.0 - height, 0.65);
+
+    float tongues = 0.04 * wave1 + 0.025 * wave2 + 0.012 * wave3;
+
+    float width = baseWidth + tongues * (0.3 + height);
+    width = max(width, 0.005);
 
     float distanceFromCenter = abs(uv.x - center);
 
@@ -51,23 +59,30 @@ void main()
     if (flameMask < 0.01)
         discard;
 
-    vec3 red = vec3(0.8, 0.025, 0.002);
-    vec3 orange = vec3(1.0, 0.16, 0.005);
-    vec3 yellow = vec3(1.0, 0.75, 0.12);
-    vec3 hotCore = vec3(1.0, 0.95, 0.65);
 
-    float coreWidth = width * 0.45;
+    vec3 darkRed = vec3(0.65, 0.015, 0.002);
+    vec3 red = vec3(1.0, 0.045, 0.002);
+    vec3 orange = vec3(1.0, 0.24, 0.008);
+    vec3 yellow = vec3(1.0, 0.72, 0.12);
+    vec3 hotCore = vec3(1.0, 0.94, 0.65);
 
-    float coreMask = 1.0 - smoothstep(coreWidth * 0.35, coreWidth, distanceFromCenter);
+    float baseGlow = 1.0 - smoothstep(0.0, 0.4, height);
 
-    float heightColor = smoothstep(0.0, 0.75, height);
+    vec3 color = mix(darkRed, orange, baseGlow);
+    color = mix(color, red, smoothstep(0.0, 0.65, height));
 
-    float hotness = clamp(coreMask * 0.85 + (innerTurbulence - 0.5) * 0.35, 0.0, 1.0);
+    float coreWidth = width * 0.48;
 
-    vec3 color = mix(red, orange, heightColor);
-    color = mix(color, yellow, hotness);
-    color = mix(color, hotCore, hotness * 0.35);
+    float coreMask = 1.0 - smoothstep(
+        coreWidth * 0.25,
+        coreWidth,
+        distanceFromCenter
+    );
 
+    float innerFlicker = 0.85 + 0.10 * sin(time * 11.0 + height * 19.0) + 0.05 * sin(time * 17.0 - height * 13.0);
+
+    color = mix(color, yellow, coreMask * innerFlicker);
+    color = mix(color, hotCore, coreMask * coreMask * 0.35);
     float tipFade = 1.0 - smoothstep(0.65, 1.0, height);
     float alpha = flameMask * tipFade;
 

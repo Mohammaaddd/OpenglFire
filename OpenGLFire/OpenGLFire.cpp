@@ -260,11 +260,12 @@ int main()
             glDrawArrays(GL_TRIANGLES, 0, 6);
         }
 
+        glUseProgram(flameShaderProgram);
 
         float currentTime = static_cast<float>(glfwGetTime());
+        //int timeLocation = glGetUniformLocation(flameShaderProgram, "time");
         glUniform1f(timeLocation, currentTime * 10);
 
-        glUseProgram(flameShaderProgram);
 
         glBindVertexArray(VAO);
         glDrawArrays(GL_TRIANGLES, 0, 6);
